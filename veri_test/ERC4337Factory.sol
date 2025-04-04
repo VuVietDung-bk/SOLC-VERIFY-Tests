@@ -9,27 +9,25 @@ contract ERC4337Factory {
         implementation = erc4337;
     }
 
-    function createAccount(bytes[] memory owners) public payable virtual returns (address account) {
+    function createAccount(
+        bytes[] memory owners
+    ) public payable virtual returns (address account) {
         account = address(new ERC4337Account());
         ERC4337Account(payable(account)).initialize(owners);
     }
-
 }
 
 contract ERC4337Account {
-
     uint8 nextOwnerIndex;
     uint8 dummy = 0;
     mapping(uint8 => bytes) ownerAtIndex;
     mapping(bytes => bool) isOwner;
 
-    constructor(){
+    constructor() {
         nextOwnerIndex = 0;
     }
 
-    function isOwnerBytes(
-        bytes memory account
-    ) public view returns (bool) {
+    function isOwnerBytes(bytes memory account) public view returns (bool) {
         return isOwner[account];
     }
 
@@ -60,10 +58,7 @@ contract ERC4337Account {
         }
     }
 
-    function _addOwnerAtIndexNoCheck(
-        bytes memory owner,
-        uint8 index
-    ) internal {
+    function _addOwnerAtIndexNoCheck(bytes memory owner, uint8 index) internal {
         if (isOwnerBytes(owner)) revert();
 
         isOwner[owner] = true;
@@ -97,4 +92,43 @@ contract ERC4337Account {
 
         _initializeOwners(owners);
     }
+}
+
+contract Hack {
+    ERC4337Factory factory;
+    ERC4337Account account;
+    bytes[5] owners;
+    mapping(bytes => bool) isOwner;
+
+    constructor() {
+        owners[0] = "idk";
+        owners[1] = "omg";
+        owners[2] = "nah";
+        owners[3] = "goku";
+        owners[4] = "ldha";
+        factory = new ERC4337Factory(address(0x046C5E73));
+    }
+
+    function vuln() public {
+        bytes[] memory emptyArray;
+        account = ERC4337Account(factory.createAccount(emptyArray));
+    }
+
+    /// @notice precondition address(account) != address(0)
+    /// @notice postcondition forall (uint i) isOwner[owners[i]] || (i >= 5)
+    function legit() public {
+        require(address(account) != address(0));
+
+        bytes[] memory convertedOwners = new bytes[](owners.length);
+
+        for (uint i = 0; i < 5; i++) {
+            convertedOwners[i] = owners[i];
+        }
+
+        account.initialize(convertedOwners);
+        for(uint i = 0; i < 5; i++){
+            isOwner[owners[i]] = account.isOwnerBytes(owners[i]);
+        }
+    }
+
 }
