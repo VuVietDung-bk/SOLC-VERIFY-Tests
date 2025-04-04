@@ -117,12 +117,14 @@ contract Hack {
     /// @notice precondition address(account) != address(0)
     /// @notice postcondition forall (uint i) isOwner[owners[i]] || (i >= 5)
     function legit() public {
-        require(address(account) != address(0));
-
         bytes[] memory convertedOwners = new bytes[](owners.length);
 
         for (uint i = 0; i < 5; i++) {
             convertedOwners[i] = owners[i];
+        }
+
+        if(address(account) == address(0)){
+            account = ERC4337Account(factory.createAccount(convertedOwners));
         }
 
         account.initialize(convertedOwners);
@@ -130,5 +132,4 @@ contract Hack {
             isOwner[owners[i]] = account.isOwnerBytes(owners[i]);
         }
     }
-
 }
