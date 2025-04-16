@@ -10,10 +10,11 @@ contract ERC4337Factory {
     }
 
     function createAccount(
-        bytes[] memory owners
+        bytes[1000] memory owners, uint length
     ) public payable virtual returns (address account) {
+        require(length <= 1000);
         account = address(new ERC4337Account());
-        ERC4337Account(payable(account)).initialize(owners);
+        ERC4337Account(payable(account)).initialize(owners, length);
     }
 }
 
@@ -35,12 +36,9 @@ contract ERC4337Account {
         return nextOwnerIndex;
     }
 
-    /// @notice precondition nextOwnerIndex == 0
-    /// @notice postcondition nextOwnerIndex == dummy
-    function _initializeOwners(bytes[] memory owners) internal {
-        dummy = uint8(owners.length);
+    function _initializeOwners(bytes[1000] memory owners, uint length) internal {
+        dummy = uint8(length);
 
-        /// @notice invariant nextOwnerIndex == i && nextOwnerIndex <= dummy
         for (uint256 i = 0; i < dummy; i++) {
             require(
                 owners[i].length == 32 || owners[i].length == 64,
@@ -85,12 +83,12 @@ contract ERC4337Account {
         result = bytes32(temp);
     }
 
-    function initialize(bytes[] memory owners) public payable virtual {
+    function initialize(bytes[1000] memory owners, uint length) public payable virtual {
         if (nextOwnerIndex != 0) {
             revert();
         }
 
-        _initializeOwners(owners);
+        _initializeOwners(owners, length);
     }
 }
 
@@ -110,24 +108,23 @@ contract Hack {
     }
 
     function vuln() public {
-        bytes[] memory emptyArray;
-        account = ERC4337Account(factory.createAccount(emptyArray));
+        bytes[1000] memory emptyArray;
+        account = ERC4337Account(factory.createAccount(emptyArray, 0));
     }
 
     /// @notice precondition address(account) != address(0)
-    /// @notice postcondition forall (uint i) isOwner[owners[i]] || (i >= 5)
+    /// @notice postcondition forall (uint i) isOwner[owners[i]] || (i >= 5) || (i < 0)
     function legit() public {
-        bytes[] memory convertedOwners = new bytes[](owners.length);
+        bytes[1000] memory convertedOwners;
 
         for (uint i = 0; i < 5; i++) {
             convertedOwners[i] = owners[i];
         }
 
         if(address(account) == address(0)){
-            account = ERC4337Account(factory.createAccount(convertedOwners));
-        }
-
-        account.initialize(convertedOwners);
+            account = ERC4337Account(factory.createAccount(convertedOwners, 5));
+        } else account.initialize(convertedOwners, 5);
+        
         for(uint i = 0; i < 5; i++){
             isOwner[owners[i]] = account.isOwnerBytes(owners[i]);
         }
