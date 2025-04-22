@@ -12,7 +12,7 @@ contract ERC4337Factory {
     function createAccount(
         bytes[1000] memory owners, uint length
     ) public payable virtual returns (address account) {
-        require(length <= 1000);
+        require(length <= 1000 && length >= 0);
         account = address(new ERC4337Account());
         ERC4337Account(payable(account)).initialize(owners, length);
     }
@@ -20,7 +20,7 @@ contract ERC4337Factory {
 
 contract ERC4337Account {
     uint8 nextOwnerIndex;
-    uint8 dummy = 0;
+    uint dummy = 0;
     mapping(uint8 => bytes) ownerAtIndex;
     mapping(bytes => bool) isOwner;
 
@@ -32,13 +32,15 @@ contract ERC4337Account {
         return isOwner[account];
     }
 
-    function getNextOwnerIndex() public view returns (uint8) {
-        return nextOwnerIndex;
-    }
-
+    /// @notice precondition nextOwnerIndex == 0
+    /// @notice precondition length >= 0
+    /// @notice postcondition nextOwnerIndex == dummy
+    /// @notice postcondition forall (uint k) !(0 <= k && k < length) || isOwner[owners[k]]
     function _initializeOwners(bytes[1000] memory owners, uint length) internal {
-        dummy = uint8(length);
+        dummy = length;
 
+        /// @notice invariant nextOwnerIndex == i && nextOwnerIndex <= dummy
+        /// @notice invariant forall (uint k) !(0 <= k && k < i) || isOwner[owners[k]]
         for (uint256 i = 0; i < dummy; i++) {
             require(
                 owners[i].length == 32 || owners[i].length == 64,
@@ -56,6 +58,7 @@ contract ERC4337Account {
         }
     }
 
+    /// @notice postcondition isOwner[owner]
     function _addOwnerAtIndexNoCheck(bytes memory owner, uint8 index) internal {
         if (isOwnerBytes(owner)) revert();
 
@@ -84,11 +87,10 @@ contract ERC4337Account {
     }
 
     function initialize(bytes[1000] memory owners, uint length) public payable virtual {
-        if (nextOwnerIndex != 0) {
-            revert();
+        require(length <= 1000 && length >= 0);
+        if (nextOwnerIndex == 0) {
+            _initializeOwners(owners, length);
         }
-
-        _initializeOwners(owners, length);
     }
 }
 
@@ -112,7 +114,6 @@ contract Hack {
         account = ERC4337Account(factory.createAccount(emptyArray, 0));
     }
 
-    /// @notice precondition address(account) != address(0)
     /// @notice postcondition forall (uint i) isOwner[owners[i]] || (i >= 5) || (i < 0)
     function legit() public {
         bytes[1000] memory convertedOwners;
@@ -125,6 +126,7 @@ contract Hack {
             account = ERC4337Account(factory.createAccount(convertedOwners, 5));
         } else account.initialize(convertedOwners, 5);
         
+        /// @notice invariant forall (uint k) !(0 <= k && k < i) || isOwner[owners[k]]
         for(uint i = 0; i < 5; i++){
             isOwner[owners[i]] = account.isOwnerBytes(owners[i]);
         }
