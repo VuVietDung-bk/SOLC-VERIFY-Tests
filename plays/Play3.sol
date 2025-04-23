@@ -16,14 +16,10 @@ contract Play3 {
 
     /// @notice precondition length >= 0
     /// @notice postcondition forall (uint k) !(0 <= k && k < length) || isOwner[owners[k]]
-    function initializeOwners(
-        bytes[1000] memory owners,
-        uint length
-    ) public {
+    function initializeOwners(bytes[1000] memory owners, uint length) public {
         /// @notice invariant forall (uint k) !(0 <= k && k < i) || isOwner[owners[k]]
         for (uint256 i = 0; i < length; i++) {
-            bool temp = owners[i].length == 32 || owners[i].length == 64;
-            if(!temp) revert();
+            require(owners[i].length == 32 || owners[i].length == 64);
             _addOwnerAtIndexNoCheck(owners[i]);
         }
     }
