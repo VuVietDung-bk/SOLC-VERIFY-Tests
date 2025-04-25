@@ -10,12 +10,10 @@ contract ERC4337Factory {
     }
 
     function createAccount(
-        bytes[1000] memory owners,
-        uint length
+        bytes[] memory owners
     ) public payable virtual returns (address account) {
-        require(length <= 1000 && length >= 0);
         account = address(new ERC4337Account());
-        ERC4337Account(payable(account)).initialize(owners, length);
+        ERC4337Account(payable(account)).initialize(owners);
     }
 }
 
@@ -34,14 +32,13 @@ contract ERC4337Account {
     }
 
     /// @notice precondition nextOwnerIndex == 0
-    /// @notice precondition length >= 0
+    /// @notice precondition owners.length >= 0
     /// @notice postcondition nextOwnerIndex == dummy
-    /// @notice postcondition forall (uint k) !(0 <= k && k < length) || isOwner[owners[k]]
+    /// @notice postcondition forall (uint k) !(0 <= k && k < owners.length) || isOwner[owners[k]]
     function _initializeOwners(
-        bytes[1000] memory owners,
-        uint length
+        bytes[] memory owners
     ) internal {
-        dummy = length;
+        dummy = owners.length;
 
         /// @notice invariant nextOwnerIndex == i && nextOwnerIndex <= dummy
         /// @notice invariant forall (uint k) !(0 <= k && k < i) || isOwner[owners[k]]
@@ -86,12 +83,10 @@ contract ERC4337Account {
 
     /// @notice postcondition nextOwnerIndex == dummy
     function initialize(
-        bytes[1000] memory owners,
-        uint length
+        bytes[] memory owners
     ) public payable virtual {
-        require(length <= 1000 && length >= 0);
         if (nextOwnerIndex == 0) {
-            _initializeOwners(owners, length);
+            _initializeOwners(owners);
         }
     }
 }
@@ -100,34 +95,18 @@ contract Hack {
     ERC4337Factory factory;
     ERC4337Account account;
     mapping(bytes => bool) isOwner;
-    bytes[1000] storageOwners;
-    bytes[1000] storageFakeOwners;
 
     constructor() {
-        storageOwners[0] = "idk";
-        storageOwners[1] = "omg";
-        storageOwners[2] = "nah";
-        storageOwners[3] = "goku";
-        storageOwners[4] = "ldha";
-
-        storageFakeOwners[0] = "1";
-        storageFakeOwners[1] = "2";
-        storageFakeOwners[2] = "3";
-        storageFakeOwners[3] = "4";
-        storageFakeOwners[4] = "5";
-
         factory = new ERC4337Factory(address(0x046C5E73));
-        bytes[1000] memory emptyArray;
-        account = ERC4337Account(factory.createAccount(emptyArray, 0));
+        bytes[] memory emptyArray;
+        account = ERC4337Account(factory.createAccount(emptyArray));
     }
 
     /// @notice precondition account.nextOwnerIndex() == 0
     /// @notice postcondition account.nextOwnerIndex() > 0
-    /// @notice postcondition forall (uint i) isOwner[storageOwners[i]] || (i >= 5) || (i < 0)
-    /// @notice postcondition forall (uint i) isOwner[storageFakeOwners[i]] || (i >= 5) || (i < 0)
-    function vuln() public {
-        bytes[1000] memory owners;
-        bytes[1000] memory fakeOwners;
+    /// @notice postcondition forall (uint i) !account.isOwner(owners[i]) || (i >= 5) || (i < 0)
+    /// @notice postcondition forall (uint i) account.isOwner(fakeOwners[i]) || (i >= 5) || (i < 0)
+    function vuln() public returns (bytes[] memory owners, bytes[] memory fakeOwners) {
 
         owners[0] = "idk";
         owners[1] = "omg";
@@ -135,30 +114,16 @@ contract Hack {
         owners[3] = "goku";
         owners[4] = "ldha";
 
-        for(uint i = 0; i < 5; i++){
-            syncState(owners[i], storageOwners[i]);
-        }
-
         fakeOwners[0] = "1";
         fakeOwners[1] = "2";
         fakeOwners[2] = "3";
         fakeOwners[3] = "4";
         fakeOwners[4] = "5";
 
-        for(uint i = 0; i < 5; i++){
-            syncState(fakeOwners[i], storageFakeOwners[i]);
-        }
+        account.initialize(fakeOwners);
 
-        account.initialize(fakeOwners, 5);
+        account.initialize(owners);
 
-        account.initialize(owners, 5);
     }
 
-    /// @notice postcondition isOwner[storBytes] == account.isOwner(memBytes)
-    function syncState(
-        bytes memory memBytes,
-        bytes storage storBytes 
-    ) internal {
-        isOwner[storBytes] = account.isOwner(memBytes);
-    }
 }
